@@ -1,0 +1,18 @@
+node_modules/
+dist/
+chrome/dist/
+edge/dist/
+dist.zip
+chrome/dist.zip
+edge/dist.zip
+*.log
+.DS_Store
+*.mp4
+*.zip
+
+# 导出的测试文件
+*.md
+!README.md
+!TESTING_NOTES*.md
+!LICENSE
+!CHANGELOG.md
