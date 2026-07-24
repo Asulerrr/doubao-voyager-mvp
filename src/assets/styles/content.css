@@ -13,6 +13,15 @@
   margin: 0;
   background: transparent;
   color: #1f1f1f;
+  flex: 0 0 auto;
+}
+
+#flow_chat_sidebar.dbx-sidebar-scroll-enabled {
+  height: 100%;
+  max-height: 100vh;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .dbx-folder-header {
@@ -224,26 +233,8 @@
   flex-direction: column;
   gap: 2px;
   min-height: 20px;
-  max-height: min(38vh, 320px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: var(--dbx-folder-text-tertiary) transparent;
   border-radius: 6px;
   transition: background-color 0.15s ease;
-}
-
-.dbx-folder-contents::-webkit-scrollbar {
-  width: 5px;
-}
-
-.dbx-folder-contents::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.dbx-folder-contents::-webkit-scrollbar-thumb {
-  background: var(--dbx-folder-text-tertiary);
-  border-radius: 3px;
 }
 
 .dbx-folder-contents.dbx-drop-target {
