@@ -94,13 +94,18 @@ export class FolderManager {
     for (const textNode of Array.from(textNodes)) {
       if (textNode.textContent?.trim() !== label || textNode.closest('#dbx-folder-section')) continue;
 
-      let item: HTMLElement | null = textNode;
-      for (let depth = 0; item && depth < 5; depth += 1, item = item.parentElement) {
-        if (item.textContent?.trim() === label && item.querySelector('svg')) return item;
-      }
-
       const interactive = textNode.closest<HTMLElement>('a, button, [role="button"]');
-      if (interactive) return interactive;
+      if (interactive && this.sidebarContainer.contains(interactive)) return interactive;
+
+      // Different Doubao releases use either SVGs or CSS-icon wrappers. Find
+      // the outermost ancestor that still represents only this one label.
+      let item = textNode;
+      let parent = item.parentElement;
+      while (parent && parent !== this.sidebarContainer && parent.textContent?.trim() === label) {
+        item = parent;
+        parent = item.parentElement;
+      }
+      return item;
     }
     return null;
   }
