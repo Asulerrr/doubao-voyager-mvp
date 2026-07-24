@@ -1,8 +1,21 @@
-# Better Doubao
+# Doubao Voyager MVP
 
-> 🔥 灵感来源于 [gemini-voyage](https://github.com/Nagi-ovo/gemini-voyager)，感谢作者的开源贡献！
+面向豆包网页版的本地优先会话工作台。当前 MVP 提供文件夹、消息定位、语料板、文本高亮、导出与 LaTeX 复制；所有业务数据默认只保存在浏览器本地。
 
-A powerful browser extension to enhance your Doubao chat experience
+本项目从 [Better_Doubao](https://github.com/Rex16200513/Better_Doubao) fork 而来，并保留其 MIT 许可证与版权声明。
+
+## MVP 架构
+
+```text
+src/core/                 本地数据模型与存储
+src/platforms/doubao/     豆包页面路由和 DOM 生命周期适配
+src/features/             文件夹、定位、语料、高亮、导出和公式功能
+src/pages/content/        扩展内容脚本入口
+```
+
+站点相关代码应集中在 `src/platforms/doubao/`。新增其他 AI 平台时，新增对应 adapter，而不是让功能模块直接耦合页面 DOM。
+
+> 安全约束：MVP 不读取页面 token、Cookie 或登录凭据；也不配置远程数据同步。
 
 ## 📢 现已在微软商店成功上线！
 
@@ -231,10 +244,10 @@ npm run build:edge
 ## 开发命令
 
 ```bash
-# 开发模式（监听文件变化）
+# 开发模式（Chrome，监听文件变化）
 npm run dev
 
-# 构建生产版本（根据保留的文件夹自动选择）
+# 构建 Chrome 生产版本
 npm run build
 
 # 类型检查

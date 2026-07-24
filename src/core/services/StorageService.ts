@@ -1,41 +1,13 @@
 import browser from 'webextension-polyfill';
 import type { FolderData, Folder, CorpusItem, TextHighlight, ConversationReference } from '../types/folder';
 
-const STORAGE_KEY = 'dvFolderData';
-const BACKUP_KEY = 'dvFolderBackup';
-const ACCOUNT_KEY = 'dvAccountId';
+const STORAGE_KEY = 'doubaoVoyagerMvp:workspace';
+const BACKUP_KEY = 'doubaoVoyagerMvp:backup';
+const ACCOUNT_KEY = 'doubaoVoyagerMvp:profile';
 
 function getCurrentAccountId(): string {
-  try {
-    const keys = ['token', 'auth_token', 'accessToken', 'userInfo', 'user_id', 'accountId'];
-    for (const key of keys) {
-      const value = localStorage.getItem(key) || sessionStorage.getItem(key);
-      if (value) {
-        try {
-          const parsed = JSON.parse(value);
-          if (parsed.id) return `user_${parsed.id}`;
-          if (parsed.userId) return `user_${parsed.userId}`;
-          if (parsed.sub) return `user_${parsed.sub}`;
-        } catch {
-          if (value.length > 10 && value.length < 200) {
-            return `token_${key}_${value.substring(0, 50)}`;
-          }
-        }
-      }
-    }
-    const cookies = document.cookie.split(';');
-    for (const cookie of cookies) {
-      const [name, value] = cookie.trim().split('=');
-      if (name && value && value.length > 10 && value.length < 200) {
-        if (name.includes('slardar') || name.includes('session') || name.includes('timestamp')) {
-          continue;
-        }
-        return `cookie_${name}_${value.substring(0, 30)}`;
-      }
-    }
-  } catch (e) {
-    console.warn('[Storage] Failed to get account ID:', e);
-  }
+  // Account credentials must never be read from the host page. Multi-account
+  // profiles will be an explicit user setting instead of inferred from tokens.
   return 'default';
 }
 

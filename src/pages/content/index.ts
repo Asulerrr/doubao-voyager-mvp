@@ -4,8 +4,10 @@ import { corpusBoard } from '../../features/corpusboard/CorpusBoard';
 import { exportManager } from '../../features/export/ExportManager';
 import { latexDownloader } from '../../features/latex/LatexDownloader';
 import { storageService } from '../../core/services/StorageService';
+import { doubaoAdapter } from '../../platforms/doubao/DoubaoAdapter';
 
 async function main() {
+  await doubaoAdapter.waitForWorkspace();
   await storageService.init();
   
   if (document.readyState === 'loading') {
