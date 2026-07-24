@@ -27,7 +27,6 @@ export class FolderManager {
     this.data = await storageService.getData();
     this.sectionCollapsed = await storageService.getSectionCollapsed();
     console.log('[FolderManager] Loaded data, folders:', this.data.folders.length);
-    this.data.folders.forEach(f => f.isExpanded = false);
     await this.waitForSidebar();
     console.log('[FolderManager] Sidebar ready, creating folder section');
     this.findSidebarContainer();
@@ -285,8 +284,22 @@ export class FolderManager {
     const folder = this.data.folders.find(f => f.id === folderId);
     if (folder && !folder.isExpanded) {
       folder.isExpanded = true;
+      void storageService.updateFolder(folderId, { isExpanded: true });
       this.render();
     }
+  }
+
+  private getCurrentConversationId(): string | null {
+    const match = window.location.pathname.match(/^\/chat\/([^/?#]+)/);
+    return match?.[1] ?? null;
+  }
+
+  private markConversationSelected(conversationId: string): void {
+    this.containerElement?.querySelectorAll<HTMLElement>('.dbx-folder-conversation').forEach((element) => {
+      const isSelected = element.dataset.conversationId === conversationId;
+      element.classList.toggle('active', isSelected);
+      element.setAttribute('aria-current', isSelected ? 'page' : 'false');
+    });
   }
 
   private findConversationFolders(conversationId: string): string[] {
@@ -310,10 +323,11 @@ export class FolderManager {
       return;
     }
 
+    const currentConversationId = this.getCurrentConversationId();
     listEl.innerHTML = this.data.folders
       .map(folder => {
         const contents = this.data.folderContents[folder.id] || [];
-        return createFolderItemHTML(folder, contents);
+        return createFolderItemHTML(folder, contents, currentConversationId);
       })
       .join('');
 
@@ -356,6 +370,7 @@ export class FolderManager {
           e.stopPropagation();
           const convId = convEl.dataset.conversationId;
           if (convId) {
+            this.markConversationSelected(convId);
             window.location.href = `/chat/${convId}`;
           }
         });
@@ -516,12 +531,13 @@ export class FolderManager {
     this.render();
   }
 
-  private toggleFolder(folderId: string): void {
+  private async toggleFolder(folderId: string): Promise<void> {
     const folder = this.data.folders.find(f => f.id === folderId);
-    if (folder) {
-      folder.isExpanded = !folder.isExpanded;
-      this.render();
-    }
+    if (!folder) return;
+
+    await storageService.updateFolder(folderId, { isExpanded: !folder.isExpanded });
+    this.data = await storageService.getData();
+    this.render();
   }
 
   private toggleSectionCollapsed(): void {

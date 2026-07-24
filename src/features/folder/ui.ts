@@ -6,7 +6,7 @@ export interface DropZoneConfig {
   onDragLeave?: (e: DragEvent) => void;
 }
 
-export function createFolderItemHTML(folder: Folder, contents: ConversationReference[]): string {
+export function createFolderItemHTML(folder: Folder, contents: ConversationReference[], currentConversationId: string | null): string {
   const color = getFolderColor(folder.color);
   const isExpanded = folder.isExpanded;
   
@@ -34,15 +34,15 @@ export function createFolderItemHTML(folder: Folder, contents: ConversationRefer
         </button>
       </div>
       <div class="dbx-folder-contents" data-folder-id="${folder.id}">
-        ${contents.map(c => createConversationItemHTML(c)).join('')}
+        ${contents.map(c => createConversationItemHTML(c, c.conversationId === currentConversationId)).join('')}
       </div>
     </div>
   `;
 }
 
-export function createConversationItemHTML(conversation: ConversationReference): string {
+export function createConversationItemHTML(conversation: ConversationReference, isActive: boolean): string {
   return `
-    <div class="dbx-folder-conversation" draggable="true" data-conversation-id="${conversation.conversationId}">
+    <div class="dbx-folder-conversation ${isActive ? 'active' : ''}" draggable="true" data-conversation-id="${conversation.conversationId}" aria-current="${isActive ? 'page' : 'false'}">
       <div class="dbx-conversation-icon">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>

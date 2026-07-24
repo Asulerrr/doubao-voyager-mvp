@@ -263,6 +263,20 @@
   background-color: var(--dbx-folder-bg-hover);
 }
 
+.dbx-folder-conversation.active {
+  background-color: #edf7f1;
+  box-shadow: inset 2px 0 #22a06b;
+}
+
+.dbx-folder-conversation.active .dbx-conversation-icon {
+  color: #22a06b;
+}
+
+.dbx-folder-conversation.active .dbx-conversation-title {
+  color: var(--dbx-folder-text-primary);
+  font-weight: 500;
+}
+
 .dbx-conversation-icon {
   display: flex;
   align-items: center;
