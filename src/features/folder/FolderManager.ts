@@ -81,32 +81,60 @@ export class FolderManager {
       if (!this.containerElement) {
         this.createFolderSection();
       } else {
+        this.positionFolderSection(this.containerElement);
         this.setupFolderEvents();
       }
     }
   }
 
-  private findMoreButtonContainer(): HTMLElement | null {
+  private findSidebarItem(label: string): HTMLElement | null {
     if (!this.sidebarContainer) return null;
 
-    const spans = this.sidebarContainer.querySelectorAll('span.font-medium');
-    for (const span of Array.from(spans)) {
-      if (span.textContent?.trim() === '更多') {
-        // 排除我们自己 folder section 内部的 span
-        if ((span as HTMLElement).closest('#dbx-folder-section')) continue;
+    const textNodes = this.sidebarContainer.querySelectorAll<HTMLElement>('span, div');
+    for (const textNode of Array.from(textNodes)) {
+      if (textNode.textContent?.trim() !== label || textNode.closest('#dbx-folder-section')) continue;
 
-        // 新版 DOM 中"更多"项外层是 <div data-expand="false">
-        const itemContainer = span.closest('div[data-expand="false"]') as HTMLElement | null;
-        if (itemContainer) return itemContainer;
-
-        // 回退：nav-link 的直接父元素
-        const navLink = span.closest('.nav-link-IkIer0') as HTMLElement | null;
-        if (navLink?.parentElement) return navLink.parentElement as HTMLElement;
-
-        return navLink;
+      let item: HTMLElement | null = textNode;
+      for (let depth = 0; item && depth < 5; depth += 1, item = item.parentElement) {
+        if (item.textContent?.trim() === label && item.querySelector('svg')) return item;
       }
+
+      const interactive = textNode.closest<HTMLElement>('a, button, [role="button"]');
+      if (interactive) return interactive;
     }
     return null;
+  }
+
+  private findCloudDriveContainer(): HTMLElement | null {
+    return this.findSidebarItem('云盘') ?? this.findSidebarItem('云空间');
+  }
+
+  private findHistoryContainer(): HTMLElement | null {
+    return this.findSidebarItem('历史对话');
+  }
+
+  private positionFolderSection(folderSection: HTMLElement): void {
+    if (!this.sidebarContainer) return;
+
+    const cloudDrive = this.findCloudDriveContainer();
+    if (cloudDrive?.parentElement) {
+      const parent = cloudDrive.parentElement;
+      if (folderSection.parentElement !== parent || folderSection.previousElementSibling !== cloudDrive) {
+        parent.insertBefore(folderSection, cloudDrive.nextElementSibling);
+      }
+      return;
+    }
+
+    const history = this.findHistoryContainer();
+    if (history?.parentElement) {
+      const parent = history.parentElement;
+      if (folderSection.parentElement !== parent || folderSection.nextElementSibling !== history) {
+        parent.insertBefore(folderSection, history);
+      }
+      return;
+    }
+
+    this.sidebarContainer.appendChild(folderSection);
   }
 
   private createFolderSection(): void {
@@ -116,26 +144,7 @@ export class FolderManager {
     tempDiv.innerHTML = createFolderSectionHTML();
     const folderSection = tempDiv.firstElementChild as HTMLElement;
 
-    // 查找"更多"按钮并贴在它下方
-    const moreContainer = this.findMoreButtonContainer();
-    if (moreContainer?.parentNode) {
-      moreContainer.parentNode.insertBefore(folderSection, moreContainer.nextSibling);
-    } else {
-      // 查找历史对话区域
-      const historySection = this.sidebarContainer.querySelector('[class*="history"]');
-      if (historySection && historySection.parentNode) {
-        historySection.parentNode.insertBefore(folderSection, historySection.nextSibling);
-      } else {
-        // 查找用户信息区域（底部），在它之前插入
-        const userSection = this.sidebarContainer.querySelector('[class*="-mx-12"]');
-        if (userSection && userSection.parentNode) {
-          userSection.parentNode.insertBefore(folderSection, userSection);
-        } else {
-          // 最后在侧边栏末尾添加
-          this.sidebarContainer.appendChild(folderSection);
-        }
-      }
-    }
+    this.positionFolderSection(folderSection);
 
     this.containerElement = folderSection;
     this.setupFolderEvents();

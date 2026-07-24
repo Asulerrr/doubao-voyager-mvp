@@ -9,52 +9,63 @@
 }
 
 .dbx-folder-section {
-  padding: 8px 12px;
-  margin-bottom: 4px;
-  background: var(--dbx-bg-base, #f9f9f9);
+  padding: 2px 8px 4px;
+  margin: 0;
+  background: transparent;
+  color: #1f1f1f;
 }
 
 .dbx-folder-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 4px;
-  margin-bottom: 4px;
+  min-height: 38px;
+  padding: 0 8px;
+  margin: 0 0 2px;
+  border-radius: 8px;
+  transition: background-color 160ms ease;
+}
+
+.dbx-folder-header:hover {
+  background: rgba(0, 0, 0, 0.045);
 }
 
 .dbx-folder-title-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  min-width: 0;
+  gap: 10px;
 }
 
 .dbx-folder-icon {
-  color: var(--dbx-folder-text-secondary);
+  flex: 0 0 auto;
+  color: currentColor;
 }
 
 .dbx-folder-title {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--dbx-folder-text-secondary);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+  color: currentColor;
 }
 
 .dbx-folder-add-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border: none;
   background: transparent;
-  color: var(--dbx-folder-text-tertiary);
+  color: #8c8c8c;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .dbx-folder-add-btn:hover {
-  background: var(--dbx-folder-bg-hover);
-  color: var(--dbx-folder-primary);
+  background: rgba(0, 0, 0, 0.07);
+  color: #1f1f1f;
 }
 
 .dbx-folder-header-actions {
@@ -67,19 +78,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border: none;
   background: transparent;
-  color: var(--dbx-folder-text-tertiary);
+  color: #8c8c8c;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .dbx-folder-toggle-btn:hover {
-  background: var(--dbx-folder-bg-hover);
-  color: var(--dbx-folder-primary);
+  background: rgba(0, 0, 0, 0.07);
+  color: #1f1f1f;
 }
 
 .dbx-folder-toggle-icon {
@@ -98,6 +109,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+  padding: 0 4px 0 36px;
   max-height: 300px;
   overflow-y: auto;
   scrollbar-width: thin;
