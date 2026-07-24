@@ -1,5 +1,5 @@
-import { storageService, type Folder, type FolderData, type ConversationReference, getFolderColor } from '../../core';
-import { createFolderItemHTML, createEmptyFolderHTML, createFolderSectionHTML, setupDropZone, setupDraggable, createIndicator, escapeHTML } from './ui';
+import { storageService, type Folder, type FolderData, type ConversationReference } from '../../core';
+import { createFolderItemHTML, createEmptyFolderHTML, createFolderSectionHTML, setupDropZone, setupDraggable, escapeHTML } from './ui';
 
 interface DragData {
   type: string;
@@ -40,7 +40,7 @@ export class FolderManager {
       console.log('[FolderManager] Container not found!');
     }
     
-    this.addConversationIndicators();
+    this.syncConversationPlacement();
     this.setupFolderDropZones();
     this.initialized = true;
   }
@@ -196,7 +196,7 @@ export class FolderManager {
             this.containerElement = existingSection as HTMLElement;
             this.setupFolderEvents();
           }
-          this.addConversationIndicators();
+          this.syncConversationPlacement();
           this.setupFolderDropZones();
         } else {
           this.findSidebarContainer();
@@ -210,59 +210,26 @@ export class FolderManager {
     }
   }
 
-  private addConversationIndicators(): void {
+  private syncConversationPlacement(): void {
     const conversations = document.querySelectorAll('[data-empty-conversation="false"] a[href^="/chat/"]');
     conversations.forEach((el) => {
       const element = el as HTMLElement;
-      if (element.dataset.dvProcessed) return;
-      element.dataset.dvProcessed = 'true';
-
       const idMatch = element.id.match(/conversation_(\d+)/);
       const conversationId = idMatch ? idMatch[1] : element.getAttribute('href')?.replace('/chat/', '');
-
       if (!conversationId) return;
 
-      const folders = this.findConversationFolders(conversationId);
-      this.updateConversationIndicator(element, folders);
+      const isFoldered = this.findConversationFolders(conversationId).length > 0;
+      element.querySelectorAll('.dbx-folder-indicator').forEach((indicator) => indicator.remove());
+
+      if (isFoldered) {
+        element.hidden = true;
+        element.dataset.dvFoldered = 'true';
+      } else if (element.dataset.dvFoldered === 'true') {
+        element.hidden = false;
+        delete element.dataset.dvFoldered;
+      }
 
       this.setupConversationDrag(element, conversationId);
-    });
-    
-    this.setupFolderDropZones();
-  }
-
-  private updateConversationIndicator(element: HTMLElement, folders: string[]): void {
-    const existingIndicator = element.querySelector('.dbx-folder-indicator');
-    
-    if (folders.length > 0) {
-      const firstFolder = this.data.folders.find(f => f.id === folders[0]);
-      const color = firstFolder ? getFolderColor(firstFolder.color) : '#6b7280';
-      
-      if (existingIndicator) {
-        (existingIndicator as HTMLElement).style.backgroundColor = color;
-      } else {
-        const indicator = createIndicator(color);
-        const wrapper = element.querySelector('.wrapper-Xy3kj9') || element.querySelector('div:first-child') || element;
-        if (wrapper) {
-          (wrapper as HTMLElement).style.position = 'relative';
-          wrapper.insertBefore(indicator, wrapper.firstChild);
-        }
-      }
-    } else if (existingIndicator) {
-      existingIndicator.remove();
-    }
-  }
-
-  private refreshAllIndicators(): void {
-    const conversations = document.querySelectorAll('[data-empty-conversation="false"] a[href^="/chat/"]');
-    conversations.forEach((el) => {
-      const element = el as HTMLElement;
-      const idMatch = element.id.match(/conversation_(\d+)/);
-      const conversationId = idMatch ? idMatch[1] : element.getAttribute('href')?.replace('/chat/', '');
-      if (!conversationId) return;
-
-      const folders = this.findConversationFolders(conversationId);
-      this.updateConversationIndicator(element, folders);
     });
   }
 
@@ -337,6 +304,7 @@ export class FolderManager {
 
     if (this.data.folders.length === 0) {
       listEl.innerHTML = createEmptyFolderHTML();
+      this.syncConversationPlacement();
       return;
     }
 
@@ -350,6 +318,7 @@ export class FolderManager {
     this.setupFolderElementEvents();
     this.setupFolderDropZones();
     this.updateSectionCollapseUI();
+    this.syncConversationPlacement();
   }
 
   private setupFolderElementEvents(): void {
@@ -474,7 +443,6 @@ export class FolderManager {
       await storageService.removeConversationFromFolder(folderId, conversationId);
       this.data = await storageService.getData();
       this.render();
-      this.refreshAllIndicators();
       this.hidePopup();
     });
 
@@ -522,9 +490,9 @@ export class FolderManager {
     };
 
     await storageService.addConversationToFolder(folderId, conversation);
+    await storageService.updateFolder(folderId, { isExpanded: true });
     this.data = await storageService.getData();
     this.render();
-    this.refreshAllIndicators();
   }
 
   private async moveConversationBetweenFolders(
@@ -541,9 +509,9 @@ export class FolderManager {
     };
 
     await storageService.moveConversationBetweenFolders(sourceFolderId, targetFolderId, conversation);
+    await storageService.updateFolder(targetFolderId, { isExpanded: true });
     this.data = await storageService.getData();
     this.render();
-    this.refreshAllIndicators();
   }
 
   private toggleFolder(folderId: string): void {
@@ -878,7 +846,6 @@ export class FolderManager {
         await storageService.updateFolder(folder.id, { color: selectedColor });
         this.data = await storageService.getData();
         this.render();
-        this.refreshAllIndicators();
         this.hidePopup();
       });
     });
@@ -906,7 +873,6 @@ export class FolderManager {
       await storageService.updateFolder(folder.id, { color: selectedColor });
       this.data = await storageService.getData();
       this.render();
-      this.refreshAllIndicators();
       this.hidePopup();
     });
     
@@ -965,7 +931,6 @@ export class FolderManager {
       await storageService.deleteFolder(folderId);
       this.data = await storageService.getData();
       this.render();
-      this.refreshAllIndicators();
       this.hidePopup();
     });
 
