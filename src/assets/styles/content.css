@@ -110,23 +110,7 @@
   flex-direction: column;
   gap: 2px;
   padding: 0 4px;
-  max-height: 300px;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--dbx-folder-text-tertiary) transparent;
-}
-
-.dbx-folder-list::-webkit-scrollbar {
-  width: 4px;
-}
-
-.dbx-folder-list::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.dbx-folder-list::-webkit-scrollbar-thumb {
-  background: var(--dbx-folder-text-tertiary);
-  border-radius: 2px;
+  overflow: visible;
 }
 
 .dbx-folder-empty {
@@ -240,8 +224,26 @@
   flex-direction: column;
   gap: 2px;
   min-height: 20px;
+  max-height: min(38vh, 320px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--dbx-folder-text-tertiary) transparent;
   border-radius: 6px;
   transition: background-color 0.15s ease;
+}
+
+.dbx-folder-contents::-webkit-scrollbar {
+  width: 5px;
+}
+
+.dbx-folder-contents::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dbx-folder-contents::-webkit-scrollbar-thumb {
+  background: var(--dbx-folder-text-tertiary);
+  border-radius: 3px;
 }
 
 .dbx-folder-contents.dbx-drop-target {

@@ -249,6 +249,7 @@ export class FolderManager {
       const element = el as HTMLElement;
       if (element.dataset.dvDropZone === 'true') return;
       element.dataset.dvDropZone = 'true';
+      this.setupFolderContentScroll(element);
 
       const folderId = element.dataset.folderId;
       if (!folderId) return;
@@ -258,6 +259,23 @@ export class FolderManager {
         onDragOver: () => this.expandFolderOnDrag(folderId),
       });
     });
+  }
+
+  private setupFolderContentScroll(element: HTMLElement): void {
+    if (element.dataset.dvScrollBound === 'true') return;
+    element.dataset.dvScrollBound = 'true';
+
+    element.addEventListener('wheel', (event) => {
+      const maxScrollTop = element.scrollHeight - element.clientHeight;
+      if (maxScrollTop <= 0) return;
+
+      const nextScrollTop = Math.min(Math.max(element.scrollTop + event.deltaY, 0), maxScrollTop);
+      if (nextScrollTop === element.scrollTop) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      element.scrollTop = nextScrollTop;
+    }, { passive: false });
   }
 
   private setupDropZoneForFolderRow(folderEl: HTMLElement, folderId: string): void {
