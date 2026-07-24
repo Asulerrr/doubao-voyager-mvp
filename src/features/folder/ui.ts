@@ -18,7 +18,11 @@ export function createFolderItemHTML(folder: Folder, contents: ConversationRefer
             <path d="M9 18l6-6-6-6"></path>
           </svg>
         </div>
-        <div class="dbx-folder-color-dot" style="background-color: ${color}"></div>
+        <div class="dbx-folder-color-dot" style="color: ${color}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H10l2 2.5h6.5A2.5 2.5 0 0 1 21 10v8.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 18.5z"></path>
+          </svg>
+        </div>
         <span class="dbx-folder-name">${escapeHTML(folder.name)}</span>
         <span class="dbx-folder-count">${contents.length}</span>
         <button class="dbx-folder-menu-btn" title="更多操作">
