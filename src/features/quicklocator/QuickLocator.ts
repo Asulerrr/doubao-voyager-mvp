@@ -21,7 +21,19 @@ export class QuickLocator {
   private isScanningVirtualHistory = false;
 
   private get scrollContainer(): HTMLElement | null {
-    return document.querySelector('[class*="v_list_scroller"], [class*="scroller"], [data-testid="flow_chat_page"], [class*="chat-container"], main, [class*="page-main"]') as HTMLElement;
+    const message = document.querySelector<HTMLElement>('[data-message-id]');
+    if (message) {
+      let ancestor = message.parentElement;
+      while (ancestor && ancestor !== document.body) {
+        const style = window.getComputedStyle(ancestor);
+        if (ancestor.scrollHeight > ancestor.clientHeight && /(auto|scroll)/.test(style.overflowY)) {
+          return ancestor;
+        }
+        ancestor = ancestor.parentElement;
+      }
+    }
+
+    return document.querySelector<HTMLElement>('[class*="v_list_scroller"], [data-testid="flow_chat_page"], [class*="chat-container"], [class*="page-main"], main');
   }
 
   init(): void {
@@ -176,39 +188,47 @@ export class QuickLocator {
   }
 
   private shouldScanVirtualHistory(container: HTMLElement): boolean {
-    return container.scrollHeight > container.clientHeight && this.markers.length <= 8;
+    return container.scrollHeight > container.clientHeight;
   }
 
   private async scanVirtualHistory(container: HTMLElement): Promise<void> {
     const originalScrollTop = container.scrollTop;
-    const step = Math.max(320, Math.floor(container.clientHeight * 0.75));
-    const maxSteps = 80;
-    let position = 0;
-    let steps = 0;
+    const originalOffsetFromBottom = Math.max(0, container.scrollHeight - container.clientHeight - originalScrollTop);
+    const step = Math.max(240, Math.floor(container.clientHeight * 0.65));
+    const maxSteps = 160;
+    let idleAtTop = 0;
 
     this.isScanningVirtualHistory = true;
     try {
-      while (steps < maxSteps) {
-        const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
-        container.scrollTop = Math.min(position, maxScrollTop);
-        await this.waitForVirtualRender();
+      for (let stepIndex = 0; stepIndex < maxSteps; stepIndex++) {
+        const heightBeforeScroll = container.scrollHeight;
+        container.scrollBy({ top: -step, behavior: 'auto' });
+        container.dispatchEvent(new Event('scroll'));
+        this.collectVisibleMessages(container);
+        await this.waitForVirtualRender(240);
         this.collectVisibleMessages(container);
 
-        if (position >= maxScrollTop) break;
-        position += step;
-        steps++;
+        if (container.scrollTop > 1) continue;
+
+        await this.waitForVirtualRender(480);
+        this.collectVisibleMessages(container);
+        const historyLoaded = container.scrollHeight > heightBeforeScroll + 8;
+        idleAtTop = historyLoaded ? 0 : idleAtTop + 1;
+        if (idleAtTop >= 3) break;
       }
     } finally {
-      container.scrollTop = originalScrollTop;
-      await this.waitForVirtualRender();
+      const restoredScrollTop = Math.max(0, container.scrollHeight - container.clientHeight - originalOffsetFromBottom);
+      container.scrollTop = restoredScrollTop;
+      container.dispatchEvent(new Event('scroll'));
+      await this.waitForVirtualRender(240);
       this.collectVisibleMessages(container);
       this.scannedVirtualHistory = true;
       this.isScanningVirtualHistory = false;
     }
   }
 
-  private waitForVirtualRender(): Promise<void> {
-    return new Promise((resolve) => window.setTimeout(resolve, 120));
+  private waitForVirtualRender(delay = 120): Promise<void> {
+    return new Promise((resolve) => window.setTimeout(resolve, delay));
   }
 
   private extractMessageText(element: HTMLElement): string {
@@ -269,6 +289,9 @@ export class QuickLocator {
       dot.className = 'dbx-locator-dot' + (marker.starred ? ' starred' : '');
       dot.setAttribute('data-marker-index', String(index));
       dot.setAttribute('data-marker-text', marker.text);
+      const maxScrollTop = Math.max(1, this.getScrollHeightForMarkers());
+      const position = Math.min(100, Math.max(0, (marker.scrollTop / maxScrollTop) * 100));
+      dot.style.top = `${position}%`;
       
       dot.addEventListener('mouseenter', (e) => {
         this.showTooltip(e.target as HTMLElement, marker);
@@ -287,6 +310,13 @@ export class QuickLocator {
 
       track.appendChild(dot);
     });
+  }
+
+  private getScrollHeightForMarkers(): number {
+    const container = this.scrollContainer;
+    const contentHeight = container ? Math.max(0, container.scrollHeight - container.clientHeight) : 0;
+    const lastMarkerTop = this.markers.at(-1)?.scrollTop ?? 0;
+    return Math.max(contentHeight, lastMarkerTop);
   }
 
   private tooltipEl: HTMLElement | null = null;
@@ -396,11 +426,19 @@ export class QuickLocator {
     const container = this.scrollContainer;
     if (!container) return;
 
-    container.scrollTo({ top: marker.scrollTop, behavior: 'auto' });
-    await this.waitForVirtualRender();
+    let messageElement: HTMLElement | undefined;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      container.scrollTo({ top: marker.scrollTop, behavior: 'auto' });
+      container.dispatchEvent(new Event('scroll'));
+      await this.waitForVirtualRender(200);
+      messageElement = Array.from(container.querySelectorAll<HTMLElement>('[data-message-id]'))
+        .find((element) => element.getAttribute('data-message-id') === marker.messageId);
+      if (messageElement) break;
+    }
 
-    const messageElement = Array.from(container.querySelectorAll<HTMLElement>('[data-message-id]'))
-      .find((element) => element.getAttribute('data-message-id') === marker.messageId);
+    messageElement ??= marker.element.isConnected && marker.element.getAttribute('data-message-id') === marker.messageId
+      ? marker.element
+      : undefined;
     if (!messageElement) return;
 
     marker.element = messageElement;
@@ -411,29 +449,6 @@ export class QuickLocator {
       messageElement.classList.remove('dbx-message-highlight');
     }, 2000);
     
-    this.scrollLocatorToMarker(marker.index);
-  }
-  
-  private scrollLocatorToMarker(index: number): void {
-    const track = this.locatorBar?.querySelector('.dbx-locator-track');
-    if (!track) return;
-    
-    const dots = track.querySelectorAll('.dbx-locator-dot');
-    const targetDot = dots[index] as HTMLElement;
-    if (!targetDot) return;
-    
-    const trackRect = track.getBoundingClientRect();
-    const dotRect = targetDot.getBoundingClientRect();
-    
-    const trackHeight = trackRect.height;
-    const dotTop = dotRect.top - trackRect.top;
-    const dotCenter = dotTop + dotRect.height / 2;
-    const scrollTarget = track.scrollTop + dotCenter - trackHeight / 2;
-    
-    track.scrollTo({
-      top: scrollTarget,
-      behavior: 'smooth'
-    });
   }
 
   private setupObserver(): void {
