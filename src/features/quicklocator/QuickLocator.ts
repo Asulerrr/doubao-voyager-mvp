@@ -1,9 +1,10 @@
 import { storageService } from '../../core/services/StorageService';
+import type { CachedMessageMarker } from '../../core/types/folder';
 
 export interface MessageMarker {
   id: string;
   messageId: string;
-  element: HTMLElement;
+  element: HTMLElement | null;
   text: string;
   index: number;
   starred: boolean;
@@ -20,6 +21,8 @@ export class QuickLocator {
   private scannedVirtualHistory = false;
   private isScanningVirtualHistory = false;
   private observedScrollContainer: HTMLElement | null = null;
+  private markerCacheTimer: number | null = null;
+  private idleSyncTimer: number | null = null;
   private handleContainerScroll = (): void => this.updateActiveMarker();
 
   private get scrollContainer(): HTMLElement | null {
@@ -99,10 +102,13 @@ export class QuickLocator {
       if (container || retries >= maxRetries) {
         if (container) {
           await this.loadStarredMessages();
-          await this.scanMessages();
+          await this.loadCachedMessages();
+          this.collectVisibleMessages(container);
+          this.scheduleMarkerCacheSave();
           this.createLocatorBar();
           this.setupObserver();
           this.setupScrollListener();
+          this.scheduleIdleSync();
         }
         return;
       }
@@ -137,11 +143,50 @@ export class QuickLocator {
 
     this.collectVisibleMessages(container);
 
-    if (!this.scannedVirtualHistory && this.shouldScanVirtualHistory(container)) {
-      await this.scanVirtualHistory(container);
-    }
-
+    this.scheduleMarkerCacheSave();
     this.updateLocatorDots();
+  }
+
+  private async loadCachedMessages(): Promise<void> {
+    if (!this.conversationId || this.conversationId === 'unknown') return;
+
+    const cachedMarkers = await storageService.getQuickLocatorMessages(this.conversationId);
+    this.markers = cachedMarkers.map((marker, index) => ({
+      id: `marker_${marker.messageId}`,
+      messageId: marker.messageId,
+      element: null,
+      text: marker.text,
+      index,
+      starred: this.starredMarkers.has(index),
+      scrollTop: marker.scrollTop,
+    }));
+  }
+
+  private scheduleMarkerCacheSave(): void {
+    if (this.markerCacheTimer) clearTimeout(this.markerCacheTimer);
+    this.markerCacheTimer = window.setTimeout(() => {
+      this.markerCacheTimer = null;
+      if (!this.conversationId || this.conversationId === 'unknown') return;
+      const cache: CachedMessageMarker[] = this.markers.map((marker) => ({
+        messageId: marker.messageId,
+        text: marker.text,
+        scrollTop: marker.scrollTop,
+      }));
+      storageService.saveQuickLocatorMessages(this.conversationId, cache);
+    }, 500);
+  }
+
+  private scheduleIdleSync(): void {
+    if (this.idleSyncTimer) clearTimeout(this.idleSyncTimer);
+    this.idleSyncTimer = window.setTimeout(() => {
+      this.idleSyncTimer = null;
+      if (this.isScanningVirtualHistory) return;
+      const container = this.scrollContainer;
+      if (!container) return;
+      this.collectVisibleMessages(container);
+      this.scheduleMarkerCacheSave();
+      this.updateLocatorDots();
+    }, 1500);
   }
 
   private collectVisibleMessages(container: HTMLElement): void {
@@ -190,10 +235,6 @@ export class QuickLocator {
     return hasUserImageBlock && hasJustifyEnd;
   }
 
-  private shouldScanVirtualHistory(container: HTMLElement): boolean {
-    return container.scrollHeight > container.clientHeight;
-  }
-
   private async scanVirtualHistory(container: HTMLElement): Promise<void> {
     const originalScrollTop = container.scrollTop;
     const originalOffsetFromBottom = Math.max(0, container.scrollHeight - container.clientHeight - originalScrollTop);
@@ -227,6 +268,7 @@ export class QuickLocator {
       this.collectVisibleMessages(container);
       this.scannedVirtualHistory = true;
       this.isScanningVirtualHistory = false;
+      this.scheduleMarkerCacheSave();
     }
   }
 
@@ -272,7 +314,10 @@ export class QuickLocator {
     bar.id = 'dbx-quick-locator';
     bar.classList.toggle('dbx-locator-dark', this.isDarkMode());
     bar.innerHTML = `
-      <div class="dbx-locator-panel"><div class="dbx-locator-message-list"></div></div>
+      <div class="dbx-locator-panel">
+        <div class="dbx-locator-message-list"></div>
+        <button type="button" class="dbx-locator-history-action">加载更早消息</button>
+      </div>
       <div class="dbx-locator-strip"></div>
     `;
     
@@ -288,7 +333,17 @@ export class QuickLocator {
     
     const strip = this.locatorBar.querySelector<HTMLElement>('.dbx-locator-strip');
     const messageList = this.locatorBar.querySelector<HTMLElement>('.dbx-locator-message-list');
+    const historyAction = this.locatorBar.querySelector<HTMLButtonElement>('.dbx-locator-history-action');
     if (!strip || !messageList) return;
+
+    if (historyAction) {
+      historyAction.hidden = this.scannedVirtualHistory;
+      historyAction.disabled = this.isScanningVirtualHistory;
+      historyAction.textContent = this.isScanningVirtualHistory ? '正在加载历史消息...' : '加载更早消息';
+      historyAction.onclick = () => {
+        void this.loadEarlierMessages();
+      };
+    }
 
     const maxHeight = Math.floor(window.innerHeight * 0.55);
     const locatorHeight = Math.min(maxHeight, Math.max(150, this.markers.length * 4));
@@ -342,14 +397,17 @@ export class QuickLocator {
     const container = this.scrollContainer;
     if (!container) return;
 
+    const visibleMarkers = this.markers.filter((marker) => marker.element?.isConnected);
+    if (visibleMarkers.length === 0) return;
+
     const viewportCenter = container.scrollTop + container.clientHeight / 2;
     let activeIndex = 0;
     let smallestDistance = Number.POSITIVE_INFINITY;
-    this.markers.forEach((marker, index) => {
+    visibleMarkers.forEach((marker) => {
       const distance = Math.abs(marker.scrollTop - viewportCenter);
       if (distance < smallestDistance) {
         smallestDistance = distance;
-        activeIndex = index;
+        activeIndex = marker.index;
       }
     });
 
@@ -361,6 +419,11 @@ export class QuickLocator {
   private async scrollToMessage(marker: MessageMarker): Promise<void> {
     const container = this.scrollContainer;
     if (!container) return;
+
+    if (!marker.element?.isConnected && !this.scannedVirtualHistory) {
+      await this.loadEarlierMessages();
+      marker = this.markers.find((candidate) => candidate.messageId === marker.messageId) ?? marker;
+    }
 
     let messageElement: HTMLElement | undefined;
     const messageViewportOffset = Math.max(0, container.clientHeight / 2 - 48);
@@ -376,7 +439,7 @@ export class QuickLocator {
       if (messageElement) break;
     }
 
-    messageElement ??= marker.element.isConnected && marker.element.getAttribute('data-message-id') === marker.messageId
+    messageElement ??= marker.element?.isConnected && marker.element.getAttribute('data-message-id') === marker.messageId
       ? marker.element
       : undefined;
     if (!messageElement) return;
@@ -388,6 +451,15 @@ export class QuickLocator {
       messageElement.classList.remove('dbx-message-highlight');
     }, 2000);
     
+  }
+
+  private async loadEarlierMessages(): Promise<void> {
+    const container = this.scrollContainer;
+    if (!container || this.isScanningVirtualHistory || this.scannedVirtualHistory) return;
+
+    this.updateLocatorDots();
+    await this.scanVirtualHistory(container);
+    this.updateLocatorDots();
   }
 
   private setupObserver(): void {
@@ -427,6 +499,8 @@ export class QuickLocator {
   }
 
   destroy(): void {
+    if (this.markerCacheTimer) clearTimeout(this.markerCacheTimer);
+    if (this.idleSyncTimer) clearTimeout(this.idleSyncTimer);
     if (this.observer) {
       this.observer.disconnect();
       this.observer = null;

@@ -1,5 +1,5 @@
 import browser from 'webextension-polyfill';
-import type { FolderData, Folder, CorpusItem, TextHighlight, ConversationReference } from '../types/folder';
+import type { FolderData, Folder, CorpusItem, TextHighlight, ConversationReference, CachedMessageMarker } from '../types/folder';
 
 const STORAGE_KEY = 'doubaoVoyagerMvp:workspace';
 const BACKUP_KEY = 'doubaoVoyagerMvp:backup';
@@ -18,7 +18,8 @@ function validateFolderData(data: unknown): data is FolderData {
     typeof d.folderContents === 'object' &&
     typeof d.starredMessages === 'object' &&
     Array.isArray(d.corpusBoard) &&
-    (d.textHighlights === undefined || Array.isArray(d.textHighlights));
+    (d.textHighlights === undefined || Array.isArray(d.textHighlights)) &&
+    (d.quickLocatorMessages === undefined || typeof d.quickLocatorMessages === 'object');
 }
 
 function createBackup(data: FolderData, accountId: string): void {
@@ -79,6 +80,7 @@ export class StorageService {
           this.data = {
             ...savedData,
             textHighlights: savedData.textHighlights ?? [],
+            quickLocatorMessages: savedData.quickLocatorMessages ?? {},
           };
           console.log('[Storage] Loaded from chrome.storage for account:', this.currentAccountId);
         } else {
@@ -87,6 +89,7 @@ export class StorageService {
             this.data = {
               ...backup,
               textHighlights: backup.textHighlights ?? [],
+              quickLocatorMessages: backup.quickLocatorMessages ?? {},
             };
             await this.persist();
             console.log('[Storage] Restored from localStorage backup');
@@ -99,6 +102,7 @@ export class StorageService {
           this.data = {
             ...backup,
             textHighlights: backup.textHighlights ?? [],
+            quickLocatorMessages: backup.quickLocatorMessages ?? {},
           };
         }
       }
@@ -235,6 +239,18 @@ export class StorageService {
 
   async getStarredMessages(conversationId: string): Promise<number[]> {
     return this.data.starredMessages[conversationId] ?? [];
+  }
+
+  async getQuickLocatorMessages(conversationId: string): Promise<CachedMessageMarker[]> {
+    return this.data.quickLocatorMessages?.[conversationId] ?? [];
+  }
+
+  saveQuickLocatorMessages(conversationId: string, messages: CachedMessageMarker[]): void {
+    if (!this.data.quickLocatorMessages) {
+      this.data.quickLocatorMessages = {};
+    }
+    this.data.quickLocatorMessages[conversationId] = messages;
+    this.debouncedSave();
   }
 
   async addStarredMessage(conversationId: string, messageIndex: number): Promise<void> {

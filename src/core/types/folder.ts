@@ -44,6 +44,12 @@ export interface TextHighlight {
   createdAt: number;
 }
 
+export interface CachedMessageMarker {
+  messageId: string;
+  text: string;
+  scrollTop: number;
+}
+
 export interface FolderData {
   folders: Folder[];
   folderContents: Record<string, ConversationReference[]>;
@@ -51,6 +57,7 @@ export interface FolderData {
   corpusBoard: CorpusItem[];
   textHighlights?: TextHighlight[];
   sectionCollapsed?: boolean;
+  quickLocatorMessages?: Record<string, CachedMessageMarker[]>;
 }
 
 export interface DragData {
