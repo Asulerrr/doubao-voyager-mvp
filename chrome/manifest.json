@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Doubao Voyager MVP",
   "description": "Local-first folders, timeline navigation, highlights, and export for Doubao conversations.",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "icons": {
     "16": "icons/icon16.png",
     "19": "icons/icon19.png",

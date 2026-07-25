@@ -159,11 +159,11 @@ export class FolderManager {
   private setupFolderEvents(): void {
     if (!this.containerElement) return;
 
-    const toggleBtn = this.containerElement.querySelector('.dbx-folder-toggle-btn');
-    if (toggleBtn && !toggleBtn.hasAttribute('data-dv-event-bound')) {
-      toggleBtn.setAttribute('data-dv-event-bound', 'true');
-      toggleBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
+    const header = this.containerElement.querySelector('.dbx-folder-header');
+    if (header && !header.hasAttribute('data-dv-event-bound')) {
+      header.setAttribute('data-dv-event-bound', 'true');
+      header.addEventListener('click', (e) => {
+        if ((e.target as HTMLElement).closest('.dbx-folder-add-btn')) return;
         this.toggleSectionCollapsed();
       });
     }
