@@ -115,34 +115,26 @@ export class QuickLocator {
     this.conversationId = this.getConversationId();
     await this.loadStarredMessages();
 
-    const userMessages = new Set<HTMLElement>();
+    const userMessages = new Map<string, HTMLElement>();
 
-    const messageElements = container.querySelectorAll('[data-message-id]');
+    const messageElements = container.querySelectorAll<HTMLElement>('[data-message-id]');
     messageElements.forEach((el) => {
-      const parent = el.closest('.inner-item-BjaxFt, .inner-item-w21SQO, [data-testid="union_message"], [data-testid="message-block-container"]');
-      if (!parent) return;
+      if (el.parentElement?.closest('[data-message-id]')) return;
 
-      const html = parent.innerHTML?.toLowerCase() || '';
-      const hasSendClass = html.includes('send_message') ||
-        html.includes('send-msg') ||
-        html.includes('user-bubble') ||
-        html.includes('bubble-bg');
+      const hasUserBubble = el.matches('.bg-g-send-msg-bubble-bg, [class*="send-msg"], [class*="send_message"], [class*="user-bubble"]') ||
+        Boolean(el.querySelector('.bg-g-send-msg-bubble-bg, [class*="send-msg"], [class*="send_message"], [class*="user-bubble"]'));
+      const hasUserImageBlock = Boolean(el.querySelector('[data-plugin-identifier*="block_type:10052"]'));
+      const hasJustifyEnd = el.matches('[class*="justify-end"]') || Boolean(el.querySelector('[class*="justify-end"]'));
 
-      const hasBubble = parent.querySelector('.bg-g-send-msg-bubble-bg, [class*="send-msg"], [class*="send_message"], [class*="user-bubble"], [class*="bubble-bg"]');
+      if (!hasUserBubble && !(hasUserImageBlock && hasJustifyEnd)) return;
 
-      if (hasSendClass || hasBubble) {
-        userMessages.add(parent as HTMLElement);
-        return;
-      }
-
-      const hasUserImageBlock = parent.querySelector('[data-plugin-identifier*="block_type:10052"]');
-      const hasJustifyEnd = parent.querySelector('[class*="justify-end"]');
-      if (hasUserImageBlock && hasJustifyEnd) {
-        userMessages.add(parent as HTMLElement);
+      const messageId = el.getAttribute('data-message-id');
+      if (messageId) {
+        userMessages.set(messageId, el);
       }
     });
 
-    this.markers = Array.from(userMessages).map((el, index) => {
+    this.markers = Array.from(userMessages.values()).map((el, index) => {
       const text = this.extractMessageText(el);
       const finalText = text || `问题 ${index + 1}`;
       return {
