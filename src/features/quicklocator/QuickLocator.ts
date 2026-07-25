@@ -1,5 +1,6 @@
 import { storageService } from '../../core/services/StorageService';
 import type { CachedMessageMarker } from '../../core/types/folder';
+import { doubaoHistoryClient, type HistoryMessage } from '../../platforms/doubao/DoubaoHistoryClient';
 
 export interface MessageMarker {
   id: string;
@@ -23,6 +24,9 @@ export class QuickLocator {
   private observedScrollContainer: HTMLElement | null = null;
   private markerCacheTimer: number | null = null;
   private idleSyncTimer: number | null = null;
+  private apiHistoryLoaded = false;
+  private apiHistoryLoading = false;
+  private apiHistoryAttempts = 0;
   private handleContainerScroll = (): void => this.updateActiveMarker();
 
   private get scrollContainer(): HTMLElement | null {
@@ -75,6 +79,9 @@ export class QuickLocator {
       
       this.markers = [];
       this.scannedVirtualHistory = false;
+      this.apiHistoryLoaded = false;
+      this.apiHistoryLoading = false;
+      this.apiHistoryAttempts = 0;
       if (this.locatorBar) {
         this.locatorBar.remove();
         this.locatorBar = null;
@@ -109,6 +116,7 @@ export class QuickLocator {
           this.setupObserver();
           this.setupScrollListener();
           this.scheduleIdleSync();
+          void this.loadApiHistory();
         }
         return;
       }
@@ -187,6 +195,81 @@ export class QuickLocator {
       this.scheduleMarkerCacheSave();
       this.updateLocatorDots();
     }, 1500);
+  }
+
+  private async loadApiHistory(): Promise<void> {
+    if (this.apiHistoryLoaded || this.apiHistoryLoading || !this.conversationId || this.conversationId === 'unknown') return;
+
+    const conversationId = this.conversationId;
+    this.apiHistoryLoading = true;
+    try {
+      const messages = await doubaoHistoryClient.loadConversation(conversationId);
+      if (this.conversationId !== conversationId || messages.length === 0) return;
+      this.apiHistoryLoaded = this.mergeApiMessages(messages);
+      if (this.apiHistoryLoaded) {
+        this.scheduleMarkerCacheSave();
+        this.updateLocatorDots();
+      } else if (this.apiHistoryAttempts < 3) {
+        this.apiHistoryAttempts++;
+        window.setTimeout(() => {
+          void this.loadApiHistory();
+        }, 1_000);
+      }
+    } catch {
+      // Keep the DOM-based scanner available as a fallback for API changes.
+    } finally {
+      if (this.conversationId === conversationId) {
+        this.apiHistoryLoading = false;
+        this.updateLocatorDots();
+      }
+    }
+  }
+
+  private mergeApiMessages(messages: HistoryMessage[]): boolean {
+    const visibleUserIds = new Set<string>();
+    const existingMarkers = new Map(this.markers.map((marker) => [marker.messageId, marker]));
+    document.querySelectorAll<HTMLElement>('[data-message-id]').forEach((element) => {
+      const messageId = element.getAttribute('data-message-id');
+      if (messageId && this.isUserMessage(element)) visibleUserIds.add(messageId);
+    });
+
+    const userSignatures = new Set(messages
+      .filter((message) => visibleUserIds.has(message.id))
+      .map((message) => message.signature)
+      .filter(Boolean));
+    const userMessages = messages.filter((message) =>
+      message.explicitRole === 'user' || visibleUserIds.has(message.id) || userSignatures.has(message.signature)
+    );
+    if (userMessages.length === 0) return false;
+
+    userMessages.forEach((message) => {
+      const existing = existingMarkers.get(message.id);
+      existingMarkers.set(message.id, {
+        id: `marker_${message.id}`,
+        messageId: message.id,
+        element: existing?.element ?? null,
+        text: this.normalizeHistoryText(message.text) || existing?.text || '问题',
+        index: existing?.index ?? 0,
+        starred: existing?.starred ?? false,
+        scrollTop: existing?.element?.isConnected ? existing.scrollTop : message.index,
+      });
+    });
+
+    this.markers = Array.from(existingMarkers.values())
+      .sort((a, b) => a.scrollTop - b.scrollTop)
+      .map((marker, index) => ({
+        ...marker,
+        index,
+        text: marker.text === '问题' ? `问题 ${index + 1}` : marker.text,
+        starred: marker.starred || this.starredMarkers.has(index),
+      }));
+    return true;
+  }
+
+  private normalizeHistoryText(text: string): string {
+    const normalized = text.replace(/\s+/g, ' ').trim();
+    if (!normalized) return '';
+    return normalized.length > 40 ? `${normalized.slice(0, 40)}...` : normalized;
   }
 
   private collectVisibleMessages(container: HTMLElement): void {
@@ -337,7 +420,7 @@ export class QuickLocator {
     if (!strip || !messageList) return;
 
     if (historyAction) {
-      historyAction.hidden = this.scannedVirtualHistory;
+      historyAction.hidden = this.scannedVirtualHistory || this.apiHistoryLoaded;
       historyAction.disabled = this.isScanningVirtualHistory;
       historyAction.textContent = this.isScanningVirtualHistory ? '正在加载历史消息...' : '加载更早消息';
       historyAction.onclick = () => {

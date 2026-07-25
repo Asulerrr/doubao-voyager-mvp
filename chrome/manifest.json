@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Doubao Voyager MVP",
   "description": "Local-first folders, timeline navigation, highlights, and export for Doubao conversations.",
-  "version": "0.1.23",
+  "version": "0.1.24",
   "icons": {
     "16": "icons/icon16.png",
     "19": "icons/icon19.png",
@@ -42,6 +42,15 @@
       ],
       "js": ["src/pages/content/index.ts"],
       "css": ["src/assets/styles/content.css"]
+    },
+    {
+      "matches": [
+        "https://www.doubao.com/*",
+        "https://doubao.com/*"
+      ],
+      "js": ["src/pages/content/historyBridge.ts"],
+      "world": "MAIN",
+      "run_at": "document_start"
     }
   ],
   "web_accessible_resources": [
