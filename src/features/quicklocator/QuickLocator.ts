@@ -363,8 +363,12 @@ export class QuickLocator {
     if (!container) return;
 
     let messageElement: HTMLElement | undefined;
+    const messageViewportOffset = Math.max(0, container.clientHeight / 2 - 48);
     for (let attempt = 0; attempt < 4; attempt++) {
-      container.scrollTo({ top: marker.scrollTop, behavior: 'auto' });
+      container.scrollTo({
+        top: Math.max(0, marker.scrollTop - messageViewportOffset),
+        behavior: 'auto',
+      });
       container.dispatchEvent(new Event('scroll'));
       await this.waitForVirtualRender(200);
       messageElement = Array.from(container.querySelectorAll<HTMLElement>('[data-message-id]'))
@@ -378,16 +382,6 @@ export class QuickLocator {
     if (!messageElement) return;
 
     marker.element = messageElement;
-    const messageRect = messageElement.getBoundingClientRect();
-    const containerRect = container.getBoundingClientRect();
-    const centeredTop = container.scrollTop + messageRect.top - containerRect.top
-      - (container.clientHeight - messageRect.height) / 2;
-    const maximumTop = Math.max(0, container.scrollHeight - container.clientHeight);
-    container.scrollTo({
-      top: Math.min(Math.max(0, centeredTop), maximumTop),
-      behavior: 'auto',
-    });
-    container.dispatchEvent(new Event('scroll'));
     
     messageElement.classList.add('dbx-message-highlight');
     setTimeout(() => {
