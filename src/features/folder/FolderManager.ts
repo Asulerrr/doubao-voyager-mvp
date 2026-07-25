@@ -16,6 +16,7 @@ export class FolderManager {
   private dragData: DragData | null = null;
   private initialized = false;
   private sectionCollapsed = false;
+  private navigationInProgress = false;
 
   constructor() {
     this.init = this.init.bind(this);
@@ -202,7 +203,7 @@ export class FolderManager {
         } else {
           this.findSidebarContainer();
         }
-      }, 100);
+      }, this.navigationInProgress ? 350 : 150);
     });
 
     const sidebar = document.querySelector('#flow_chat_sidebar');
@@ -302,6 +303,25 @@ export class FolderManager {
     });
   }
 
+  private openConversation(conversationId: string): void {
+    const href = `/chat/${conversationId}`;
+    const sourceConversation = Array.from(
+      document.querySelectorAll<HTMLAnchorElement>('[data-empty-conversation="false"] a[href^="/chat/"]')
+    ).find((element) => element.getAttribute('href') === href);
+
+    this.navigationInProgress = true;
+    window.setTimeout(() => {
+      this.navigationInProgress = false;
+    }, 500);
+
+    if (sourceConversation) {
+      sourceConversation.click();
+      return;
+    }
+
+    window.location.href = href;
+  }
+
   private findConversationFolders(conversationId: string): string[] {
     const folders: string[] = [];
     for (const [folderId, contents] of Object.entries(this.data.folderContents)) {
@@ -371,7 +391,7 @@ export class FolderManager {
           const convId = convEl.dataset.conversationId;
           if (convId) {
             this.markConversationSelected(convId);
-            window.location.href = `/chat/${convId}`;
+            this.openConversation(convId);
           }
         });
 
