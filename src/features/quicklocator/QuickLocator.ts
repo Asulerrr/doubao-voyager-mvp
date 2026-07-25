@@ -378,7 +378,16 @@ export class QuickLocator {
     if (!messageElement) return;
 
     marker.element = messageElement;
-    messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const messageRect = messageElement.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    const centeredTop = container.scrollTop + messageRect.top - containerRect.top
+      - (container.clientHeight - messageRect.height) / 2;
+    const maximumTop = Math.max(0, container.scrollHeight - container.clientHeight);
+    container.scrollTo({
+      top: Math.min(Math.max(0, centeredTop), maximumTop),
+      behavior: 'auto',
+    });
+    container.dispatchEvent(new Event('scroll'));
     
     messageElement.classList.add('dbx-message-highlight');
     setTimeout(() => {
