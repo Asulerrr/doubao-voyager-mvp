@@ -19,6 +19,8 @@ export class QuickLocator {
   private conversationId: string = 'unknown';
   private scannedVirtualHistory = false;
   private isScanningVirtualHistory = false;
+  private observedScrollContainer: HTMLElement | null = null;
+  private handleContainerScroll = (): void => this.updateViewportIndicator();
 
   private get scrollContainer(): HTMLElement | null {
     const message = document.querySelector<HTMLElement>('[data-message-id]');
@@ -100,6 +102,7 @@ export class QuickLocator {
           await this.scanMessages();
           this.createLocatorBar();
           this.setupObserver();
+          this.setupScrollListener();
         }
         return;
       }
@@ -267,29 +270,38 @@ export class QuickLocator {
 
     const bar = document.createElement('div');
     bar.id = 'dbx-quick-locator';
+    bar.classList.toggle('dbx-locator-dark', this.isDarkMode());
     bar.innerHTML = `
-      <div class="dbx-locator-track"></div>
+      <div class="dbx-locator-track">
+        <div class="dbx-locator-rail"></div>
+        <div class="dbx-locator-viewport"></div>
+      </div>
     `;
     
     document.body.appendChild(bar);
     this.locatorBar = bar;
+    const track = bar.querySelector<HTMLElement>('.dbx-locator-track');
+    if (track) this.setupTrackInteraction(track);
     this.updateLocatorDots();
   }
 
   private updateLocatorDots(): void {
     if (!this.locatorBar) return;
+
+    this.locatorBar.classList.toggle('dbx-locator-dark', this.isDarkMode());
     
     const track = this.locatorBar.querySelector('.dbx-locator-track');
     if (!track) return;
 
-    track.innerHTML = '';
+    track.querySelectorAll('.dbx-locator-dot').forEach((dot) => dot.remove());
+    const maxScrollTop = Math.max(1, this.getScrollHeightForMarkers());
 
     this.markers.forEach((marker, index) => {
       const dot = document.createElement('button');
       dot.className = 'dbx-locator-dot' + (marker.starred ? ' starred' : '');
       dot.setAttribute('data-marker-index', String(index));
       dot.setAttribute('data-marker-text', marker.text);
-      const maxScrollTop = Math.max(1, this.getScrollHeightForMarkers());
+      dot.setAttribute('aria-label', `跳转到问题 ${index + 1}: ${marker.text}`);
       const position = Math.min(100, Math.max(0, (marker.scrollTop / maxScrollTop) * 100));
       dot.style.top = `${position}%`;
       
@@ -310,6 +322,8 @@ export class QuickLocator {
 
       track.appendChild(dot);
     });
+
+    this.updateViewportIndicator();
   }
 
   private getScrollHeightForMarkers(): number {
@@ -317,6 +331,68 @@ export class QuickLocator {
     const contentHeight = container ? Math.max(0, container.scrollHeight - container.clientHeight) : 0;
     const lastMarkerTop = this.markers.at(-1)?.scrollTop ?? 0;
     return Math.max(contentHeight, lastMarkerTop);
+  }
+
+  private isDarkMode(): boolean {
+    return document.documentElement.dataset.theme === 'dark' ||
+      document.body.classList.contains('dark') ||
+      window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+
+  private setupTrackInteraction(track: HTMLElement): void {
+    track.addEventListener('pointerdown', (event) => {
+      const target = event.target as HTMLElement;
+      if (target.closest('.dbx-locator-dot')) return;
+
+      event.preventDefault();
+      this.seekToTrackPosition(track, event.clientY);
+
+      const onPointerMove = (moveEvent: PointerEvent) => {
+        this.seekToTrackPosition(track, moveEvent.clientY);
+      };
+      const onPointerUp = () => {
+        document.removeEventListener('pointermove', onPointerMove);
+        document.removeEventListener('pointerup', onPointerUp);
+      };
+
+      document.addEventListener('pointermove', onPointerMove);
+      document.addEventListener('pointerup', onPointerUp, { once: true });
+    });
+  }
+
+  private seekToTrackPosition(track: HTMLElement, clientY: number): void {
+    const container = this.scrollContainer;
+    if (!container) return;
+
+    const rect = track.getBoundingClientRect();
+    const progress = Math.min(1, Math.max(0, (clientY - rect.top) / rect.height));
+    const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
+    container.scrollTo({ top: progress * maxScrollTop, behavior: 'auto' });
+    this.updateViewportIndicator();
+  }
+
+  private setupScrollListener(): void {
+    const container = this.scrollContainer;
+    if (!container || this.observedScrollContainer === container) return;
+
+    this.observedScrollContainer?.removeEventListener('scroll', this.handleContainerScroll);
+    this.observedScrollContainer = container;
+    container.addEventListener('scroll', this.handleContainerScroll, { passive: true });
+  }
+
+  private updateViewportIndicator(): void {
+    const track = this.locatorBar?.querySelector<HTMLElement>('.dbx-locator-track');
+    const viewport = track?.querySelector<HTMLElement>('.dbx-locator-viewport');
+    const container = this.scrollContainer;
+    if (!track || !viewport || !container || track.clientHeight === 0) return;
+
+    const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
+    const viewportHeight = Math.min(track.clientHeight, Math.max(24, track.clientHeight * (container.clientHeight / container.scrollHeight)));
+    const travel = Math.max(0, track.clientHeight - viewportHeight);
+    const top = maxScrollTop === 0 ? 0 : travel * (container.scrollTop / maxScrollTop);
+
+    viewport.style.height = `${viewportHeight}px`;
+    viewport.style.transform = `translateY(${top}px)`;
   }
 
   private tooltipEl: HTMLElement | null = null;
@@ -492,6 +568,8 @@ export class QuickLocator {
       this.observer.disconnect();
       this.observer = null;
     }
+    this.observedScrollContainer?.removeEventListener('scroll', this.handleContainerScroll);
+    this.observedScrollContainer = null;
     if (this.locatorBar) {
       this.locatorBar.remove();
       this.locatorBar = null;
