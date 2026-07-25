@@ -221,18 +221,39 @@ export class FolderManager {
       if (!conversationId) return;
 
       const isFoldered = this.findConversationFolders(conversationId).length > 0;
+      const conversationRow = this.getConversationRow(element);
       element.querySelectorAll('.dbx-folder-indicator').forEach((indicator) => indicator.remove());
 
-      if (isFoldered) {
-        element.hidden = true;
-        element.dataset.dvFoldered = 'true';
-      } else if (element.dataset.dvFoldered === 'true') {
+      // Versions before 0.1.13 hid only the anchor, which could leave an empty row behind.
+      if (element.dataset.dvFoldered === 'true' && conversationRow !== element) {
         element.hidden = false;
         delete element.dataset.dvFoldered;
       }
 
+      if (isFoldered) {
+        conversationRow.hidden = true;
+        conversationRow.dataset.dvFoldered = 'true';
+      } else if (conversationRow.dataset.dvFoldered === 'true') {
+        conversationRow.hidden = false;
+        delete conversationRow.dataset.dvFoldered;
+      }
+
       this.setupConversationDrag(element, conversationId);
     });
+  }
+
+  private getConversationRow(conversation: HTMLElement): HTMLElement {
+    let row = conversation;
+    let parent = conversation.parentElement;
+
+    while (parent && parent !== this.sidebarContainer) {
+      const links = parent.querySelectorAll<HTMLAnchorElement>('a[href^="/chat/"]');
+      if (links.length !== 1 || links[0] !== conversation) break;
+      row = parent;
+      parent = parent.parentElement;
+    }
+
+    return row;
   }
 
   private setupConversationDrag(element: HTMLElement, conversationId: string): void {
