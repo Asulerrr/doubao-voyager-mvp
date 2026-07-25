@@ -9,9 +9,12 @@ export interface DropZoneConfig {
 export function createFolderItemHTML(folder: Folder, contents: ConversationReference[], currentConversationId: string | null): string {
   const color = getFolderColor(folder.color);
   const isExpanded = folder.isExpanded;
+  const containsCurrentConversation = contents.some(
+    (conversation) => conversation.conversationId === currentConversationId
+  );
   
   return `
-    <div class="dbx-folder-item ${isExpanded ? 'expanded' : ''}" data-folder-id="${folder.id}" data-folder-color="${folder.color}">
+    <div class="dbx-folder-item ${isExpanded ? 'expanded' : ''} ${containsCurrentConversation ? 'contains-active-conversation' : ''}" data-folder-id="${folder.id}" data-folder-color="${folder.color}">
       <div class="dbx-folder-row" data-folder-id="${folder.id}">
         <div class="dbx-folder-expand-icon ${isExpanded ? 'expanded' : ''}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -25,6 +28,7 @@ export function createFolderItemHTML(folder: Folder, contents: ConversationRefer
         </div>
         <span class="dbx-folder-name">${escapeHTML(folder.name)}</span>
         <span class="dbx-folder-count">${contents.length}</span>
+        ${containsCurrentConversation ? '<span class="dbx-folder-active-indicator" title="当前会话所在文件夹" aria-label="当前会话所在文件夹"></span>' : ''}
         <button class="dbx-folder-menu-btn" title="更多操作">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
             <circle cx="12" cy="5" r="1.5"></circle>

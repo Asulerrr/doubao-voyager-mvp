@@ -172,6 +172,15 @@
   background-color: var(--dbx-folder-bg-hover);
 }
 
+.dbx-folder-item.contains-active-conversation > .dbx-folder-row {
+  background-color: #edf7f1;
+  box-shadow: inset 2px 0 #22a06b;
+}
+
+.dbx-folder-item.contains-active-conversation > .dbx-folder-row .dbx-folder-name {
+  font-weight: 500;
+}
+
 .dbx-folder-expand-icon {
   display: flex;
   align-items: center;
@@ -211,6 +220,15 @@
   padding: 0;
   min-width: 16px;
   text-align: center;
+}
+
+.dbx-folder-active-indicator {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 50%;
+  background: #22a06b;
+  box-shadow: 0 0 0 2px #d6f0e1;
 }
 
 .dbx-folder-menu-btn {

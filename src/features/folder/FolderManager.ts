@@ -584,7 +584,7 @@ export class FolderManager {
         <input type="text" class="dbx-popup-input" placeholder="输入文件夹名称" maxlength="20">
         <div class="dbx-popup-color-label">选择颜色</div>
         <div class="dbx-popup-colors">
-          ${this.getColorOptionsHTML('blue')}
+          ${this.getColorOptionsHTML('gray')}
         </div>
         <div class="dbx-popup-actions">
           <button class="dbx-popup-btn dbx-popup-btn-cancel">取消</button>
@@ -623,17 +623,20 @@ export class FolderManager {
     const input = popup.querySelector('.dbx-popup-input') as HTMLInputElement;
     input?.focus();
 
-    let selectedColor = 'blue';
+    let selectedColor = 'gray';
     const colorOptions = popup.querySelectorAll('.dbx-color-option');
     colorOptions.forEach(opt => {
       opt.addEventListener('click', () => {
         colorOptions.forEach(o => o.classList.remove('selected'));
         opt.classList.add('selected');
-        selectedColor = (opt as HTMLElement).dataset.color || 'blue';
+        selectedColor = (opt as HTMLElement).dataset.color || 'gray';
       });
     });
-    colorOptions[0]?.classList.add('selected');
-    selectedColor = (colorOptions[0] as HTMLElement)?.dataset.color || 'blue';
+    const defaultColorOption = Array.from(colorOptions).find(
+      (option) => (option as HTMLElement).dataset.color === 'gray'
+    ) as HTMLElement | undefined;
+    defaultColorOption?.classList.add('selected');
+    selectedColor = defaultColorOption?.dataset.color || 'gray';
 
     const colorPicker = popup.querySelector('.dbx-color-picker') as HTMLInputElement;
     const customColorOption = popup.querySelector('.dbx-color-custom');
