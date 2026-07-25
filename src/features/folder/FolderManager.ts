@@ -85,6 +85,7 @@ export class FolderManager {
         this.positionFolderSection(this.containerElement);
         this.setupFolderEvents();
       }
+      this.updateTheme();
     }
   }
 
@@ -203,6 +204,7 @@ export class FolderManager {
         } else {
           this.findSidebarContainer();
         }
+        this.updateTheme();
       }, this.navigationInProgress ? 350 : 150);
     });
 
@@ -254,6 +256,24 @@ export class FolderManager {
     }
 
     return row;
+  }
+
+  private updateTheme(): void {
+    if (!this.containerElement) return;
+
+    let element: HTMLElement | null = this.sidebarContainer;
+    while (element) {
+      const color = getComputedStyle(element).backgroundColor;
+      const match = color.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)$/);
+      if (match && (!match[4] || Number(match[4]) > 0)) {
+        const luminance = (Number(match[1]) * 0.2126 + Number(match[2]) * 0.7152 + Number(match[3]) * 0.0722) / 255;
+        this.containerElement.classList.toggle('dbx-dark', luminance < 0.45);
+        return;
+      }
+      element = element.parentElement;
+    }
+
+    this.containerElement.classList.toggle('dbx-dark', window.matchMedia('(prefers-color-scheme: dark)').matches);
   }
 
   private setupConversationDrag(element: HTMLElement, conversationId: string): void {
@@ -376,6 +396,7 @@ export class FolderManager {
     this.setupFolderDropZones();
     this.updateSectionCollapseUI();
     this.syncConversationPlacement();
+    this.updateTheme();
   }
 
   private setupFolderElementEvents(): void {

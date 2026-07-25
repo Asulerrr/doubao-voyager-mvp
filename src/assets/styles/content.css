@@ -12,8 +12,56 @@
   padding: 2px 4px 4px;
   margin: 0;
   background: transparent;
-  color: #1f1f1f;
+  color: var(--dbx-folder-text-primary);
   flex: 0 0 auto;
+}
+
+.dbx-folder-section.dbx-dark {
+  --dbx-folder-text-primary: #f3f4f6;
+  --dbx-folder-text-secondary: #d1d5db;
+  --dbx-folder-text-tertiary: #9ca3af;
+  --dbx-folder-bg-hover: #303030;
+  --dbx-folder-border: #4b5563;
+  color: var(--dbx-folder-text-primary);
+}
+
+.dbx-folder-section.dbx-dark .dbx-folder-header:hover {
+  background: #303030;
+}
+
+.dbx-folder-section.dbx-dark .dbx-folder-add-btn,
+.dbx-folder-section.dbx-dark .dbx-folder-toggle-btn,
+.dbx-folder-section.dbx-dark .dbx-folder-menu-btn {
+  color: #cbd5e1;
+}
+
+.dbx-folder-section.dbx-dark .dbx-folder-add-btn:hover,
+.dbx-folder-section.dbx-dark .dbx-folder-toggle-btn:hover {
+  background: #3b3b3b;
+  color: #ffffff;
+}
+
+.dbx-folder-section.dbx-dark .dbx-folder-item[data-folder-color="gray"] .dbx-folder-color-dot {
+  color: #b6beca !important;
+}
+
+.dbx-folder-section.dbx-dark .dbx-folder-item.contains-active-conversation > .dbx-folder-row {
+  background: #203b30;
+  box-shadow: inset 2px 0 #4ade80;
+}
+
+.dbx-folder-section.dbx-dark .dbx-folder-active-indicator {
+  background: #4ade80;
+  box-shadow: 0 0 0 2px #234a39;
+}
+
+.dbx-folder-section.dbx-dark .dbx-folder-conversation.active {
+  background: #203b30;
+  box-shadow: inset 2px 0 #4ade80;
+}
+
+.dbx-folder-section.dbx-dark .dbx-folder-conversation.active .dbx-conversation-icon {
+  color: #4ade80;
 }
 
 #flow_chat_sidebar.dbx-sidebar-scroll-enabled {
