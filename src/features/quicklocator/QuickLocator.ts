@@ -115,7 +115,7 @@ export class QuickLocator {
     this.conversationId = this.getConversationId();
     await this.loadStarredMessages();
 
-    const userMessages: HTMLElement[] = [];
+    const userMessages = new Set<HTMLElement>();
 
     const messageElements = container.querySelectorAll('[data-message-id]');
     messageElements.forEach((el) => {
@@ -131,18 +131,18 @@ export class QuickLocator {
       const hasBubble = parent.querySelector('.bg-g-send-msg-bubble-bg, [class*="send-msg"], [class*="send_message"], [class*="user-bubble"], [class*="bubble-bg"]');
 
       if (hasSendClass || hasBubble) {
-        userMessages.push(parent as HTMLElement);
+        userMessages.add(parent as HTMLElement);
         return;
       }
 
       const hasUserImageBlock = parent.querySelector('[data-plugin-identifier*="block_type:10052"]');
       const hasJustifyEnd = parent.querySelector('[class*="justify-end"]');
       if (hasUserImageBlock && hasJustifyEnd) {
-        userMessages.push(parent as HTMLElement);
+        userMessages.add(parent as HTMLElement);
       }
     });
 
-    this.markers = userMessages.map((el, index) => {
+    this.markers = Array.from(userMessages).map((el, index) => {
       const text = this.extractMessageText(el);
       const finalText = text || `问题 ${index + 1}`;
       return {
@@ -376,6 +376,8 @@ export class QuickLocator {
   private setupObserver(): void {
     const container = this.scrollContainer;
     if (!container) return;
+
+    this.observer?.disconnect();
 
     this.observer = new MutationObserver((mutations) => {
       let shouldRescan = false;
