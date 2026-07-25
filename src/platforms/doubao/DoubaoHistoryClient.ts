@@ -10,6 +10,30 @@ interface HistoryPage {
   messages: HistoryMessage[];
   nextAnchor: number | null;
   hasMore: boolean;
+  diagnostics: PageDiagnostics;
+}
+
+interface PageDiagnostics {
+  payloadKeys: string[];
+  messageRecordCandidates: number;
+  parsedMessages: number;
+  messageFieldSamples: string[][];
+  nextAnchor: number | null;
+  hasMore: boolean;
+}
+
+export interface HistoryDiagnostics {
+  pagesRequested: number;
+  bridgeErrors: string[];
+  httpStatuses: number[];
+  businessStatuses: string[];
+  payloadKeys: string[][];
+  messageRecordCandidates: number;
+  parsedMessages: number;
+  userRoleMessages: number;
+  signatureSamples: string[];
+  messageFieldSamples: string[][];
+  anchors: Array<number | null>;
 }
 
 interface BridgeResponse {
@@ -17,6 +41,12 @@ interface BridgeResponse {
   ok: boolean;
   error?: string;
   payload?: unknown;
+  diagnostics?: {
+    endpointFound?: boolean;
+    httpStatus?: number;
+    businessStatus?: string;
+    payloadKeys?: string[];
+  };
 }
 
 const REQUEST_EVENT = 'dbx-history-request';
@@ -30,7 +60,9 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 }
 
 function stringValue(value: unknown): string | null {
-  return typeof value === 'string' && value.trim() ? value.trim() : null;
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  return null;
 }
 
 function numericValue(value: unknown): number | null {
@@ -98,8 +130,8 @@ function collectMessageRecords(value: unknown, collected: Record<string, unknown
   }
 
   const record = value as Record<string, unknown>;
-  const id = stringValue(findValue(record, ['message_id', 'messageId']));
-  const content = findValue(record, ['content', 'message_content', 'content_text', 'text']);
+  const id = stringValue(findValue(record, ['message_id', 'messageId', 'id']));
+  const content = findValue(record, ['content', 'message_content', 'content_text', 'text', 'content_v2', 'message']);
   if (id && content !== undefined) collected.push(record);
   Object.values(record).forEach((item) => collectMessageRecords(item, collected, seen));
   return collected;
@@ -129,9 +161,9 @@ function parsePage(payload: unknown): HistoryPage {
   const records = collectMessageRecords(payload);
   const messages = new Map<string, HistoryMessage>();
   records.forEach((record) => {
-    const id = stringValue(findValue(record, ['message_id', 'messageId']));
+    const id = stringValue(findValue(record, ['message_id', 'messageId', 'id']));
     if (!id) return;
-    const text = textFromValue(findValue(record, ['content', 'message_content', 'content_text', 'text']));
+    const text = textFromValue(findValue(record, ['content', 'message_content', 'content_text', 'text', 'content_v2', 'message']));
     if (!text) return;
     const index = numericValue(findValue(record, ['index', 'message_index', 'sequence', 'seq'])) ?? 0;
     messages.set(id, {
@@ -151,6 +183,14 @@ function parsePage(payload: unknown): HistoryPage {
     messages: Array.from(messages.values()),
     nextAnchor: pagination.nextAnchor ?? (messageIndexes.length ? Math.min(...messageIndexes) - 1 : null),
     hasMore: pagination.hasMore,
+    diagnostics: {
+      payloadKeys: Object.keys(asRecord(payload) ?? {}).slice(0, 30),
+      messageRecordCandidates: records.length,
+      parsedMessages: messages.size,
+      messageFieldSamples: records.slice(0, 8).map((record) => Object.keys(record).sort().slice(0, 30)),
+      nextAnchor: pagination.nextAnchor ?? (messageIndexes.length ? Math.min(...messageIndexes) - 1 : null),
+      hasMore: pagination.hasMore,
+    },
   };
 }
 
@@ -171,21 +211,48 @@ export class DoubaoHistoryClient {
     });
   }
 
-  async loadConversation(conversationId: string): Promise<HistoryMessage[]> {
+  async loadConversation(conversationId: string): Promise<{ messages: HistoryMessage[]; diagnostics: HistoryDiagnostics }> {
     const allMessages = new Map<string, HistoryMessage>();
+    const diagnostics: HistoryDiagnostics = {
+      pagesRequested: 0,
+      bridgeErrors: [],
+      httpStatuses: [],
+      businessStatuses: [],
+      payloadKeys: [],
+      messageRecordCandidates: 0,
+      parsedMessages: 0,
+      userRoleMessages: 0,
+      signatureSamples: [],
+      messageFieldSamples: [],
+      anchors: [],
+    };
     let anchorIndex: number | undefined;
     for (let pageNumber = 0; pageNumber < PAGE_LIMIT; pageNumber++) {
       const response = await this.requestPage(conversationId, anchorIndex);
-      if (!response.ok || !response.payload) break;
+      diagnostics.pagesRequested++;
+      if (response.diagnostics?.httpStatus !== undefined) diagnostics.httpStatuses.push(response.diagnostics.httpStatus);
+      if (response.diagnostics?.businessStatus) diagnostics.businessStatuses.push(response.diagnostics.businessStatus);
+      if (!response.ok || !response.payload) {
+        diagnostics.bridgeErrors.push(response.error ?? 'empty_history_response');
+        break;
+      }
 
       const page = parsePage(response.payload);
+      diagnostics.payloadKeys.push([...new Set([...(response.diagnostics?.payloadKeys ?? []), ...page.diagnostics.payloadKeys])]);
+      diagnostics.messageRecordCandidates += page.diagnostics.messageRecordCandidates;
+      diagnostics.parsedMessages += page.diagnostics.parsedMessages;
+      diagnostics.messageFieldSamples.push(...page.diagnostics.messageFieldSamples);
+      diagnostics.anchors.push(page.diagnostics.nextAnchor);
       page.messages.forEach((message) => allMessages.set(message.id, message));
       const mayHaveAnotherPage = page.hasMore || page.messages.length >= 20;
       if (page.messages.length === 0 || !mayHaveAnotherPage || page.nextAnchor === null || page.nextAnchor === anchorIndex) break;
       anchorIndex = page.nextAnchor;
       await new Promise((resolve) => window.setTimeout(resolve, 80));
     }
-    return Array.from(allMessages.values()).sort((a, b) => a.index - b.index);
+    const messages = Array.from(allMessages.values()).sort((a, b) => a.index - b.index);
+    diagnostics.userRoleMessages = messages.filter((message) => message.explicitRole === 'user').length;
+    diagnostics.signatureSamples = [...new Set(messages.map((message) => message.signature).filter(Boolean))].slice(0, 12);
+    return { messages, diagnostics };
   }
 
   private requestPage(conversationId: string, anchorIndex?: number): Promise<BridgeResponse> {

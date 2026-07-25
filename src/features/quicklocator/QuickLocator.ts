@@ -203,7 +203,11 @@ export class QuickLocator {
     const conversationId = this.conversationId;
     this.apiHistoryLoading = true;
     try {
-      const messages = await doubaoHistoryClient.loadConversation(conversationId);
+      const { messages, diagnostics } = await doubaoHistoryClient.loadConversation(conversationId);
+      console.info('[Doubao Voyager] history API', {
+        ...diagnostics,
+        apiMessages: messages.length,
+      });
       if (this.conversationId !== conversationId || messages.length === 0) return;
       this.apiHistoryLoaded = this.mergeApiMessages(messages);
       if (this.apiHistoryLoaded) {
@@ -240,6 +244,13 @@ export class QuickLocator {
     const userMessages = messages.filter((message) =>
       message.explicitRole === 'user' || visibleUserIds.has(message.id) || userSignatures.has(message.signature)
     );
+    console.info('[Doubao Voyager] history merge', {
+      apiMessages: messages.length,
+      visibleUserIds: visibleUserIds.size,
+      explicitRoleUser: messages.filter((message) => message.explicitRole === 'user').length,
+      signatureUser: messages.filter((message) => userSignatures.has(message.signature)).length,
+      finalUserMessages: userMessages.length,
+    });
     if (userMessages.length === 0) return false;
 
     userMessages.forEach((message) => {

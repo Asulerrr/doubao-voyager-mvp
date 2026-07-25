@@ -22,6 +22,23 @@ function findHistoryEndpoint(): string | null {
     .at(-1) ?? null;
 }
 
+function payloadKeys(payload: unknown): string[] {
+  return typeof payload === 'object' && payload !== null && !Array.isArray(payload)
+    ? Object.keys(payload as Record<string, unknown>).slice(0, 30)
+    : [];
+}
+
+function businessStatus(payload: unknown): string | undefined {
+  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) return undefined;
+  const record = payload as Record<string, unknown>;
+  const code = record.status_code ?? record.statusCode ?? record.code;
+  const desc = record.status_desc ?? record.statusDesc;
+  if (code === undefined && desc === undefined) return undefined;
+  return [code, typeof desc === 'string' ? desc.slice(0, 80) : desc]
+    .filter((value) => value !== undefined && value !== '')
+    .join(':');
+}
+
 window.addEventListener(REQUEST_EVENT, (event: Event) => {
   const detail = (event as CustomEvent<string>).detail;
   let request: HistoryRequest;
@@ -33,7 +50,11 @@ window.addEventListener(REQUEST_EVENT, (event: Event) => {
 
   const endpoint = findHistoryEndpoint();
   if (!endpoint) {
-    sendResponse(request.requestId, { ok: false, error: 'history_endpoint_unavailable' });
+    sendResponse(request.requestId, {
+      ok: false,
+      error: 'history_endpoint_unavailable',
+      diagnostics: { endpointFound: false },
+    });
     return;
   }
 
@@ -69,9 +90,22 @@ window.addEventListener(REQUEST_EVENT, (event: Event) => {
   })
     .then(async (response) => {
       const payload = await response.json() as unknown;
-      sendResponse(request.requestId, { ok: response.ok, payload });
+      sendResponse(request.requestId, {
+        ok: response.ok,
+        payload,
+        diagnostics: {
+          endpointFound: true,
+          httpStatus: response.status,
+          businessStatus: businessStatus(payload),
+          payloadKeys: payloadKeys(payload),
+        },
+      });
     })
     .catch(() => {
-      sendResponse(request.requestId, { ok: false, error: 'history_request_failed' });
+      sendResponse(request.requestId, {
+        ok: false,
+        error: 'history_request_failed',
+        diagnostics: { endpointFound: true },
+      });
     });
 });
