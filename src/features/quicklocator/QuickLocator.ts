@@ -2,10 +2,12 @@ import { storageService } from '../../core/services/StorageService';
 
 export interface MessageMarker {
   id: string;
+  messageId: string;
   element: HTMLElement;
   text: string;
   index: number;
   starred: boolean;
+  scrollTop: number;
 }
 
 export class QuickLocator {
@@ -15,6 +17,8 @@ export class QuickLocator {
   private observer: MutationObserver | null = null;
   private starredMarkers: Set<number> = new Set();
   private conversationId: string = 'unknown';
+  private scannedVirtualHistory = false;
+  private isScanningVirtualHistory = false;
 
   private get scrollContainer(): HTMLElement | null {
     return document.querySelector('[class*="v_list_scroller"], [class*="scroller"], [data-testid="flow_chat_page"], [class*="chat-container"], main, [class*="page-main"]') as HTMLElement;
@@ -53,6 +57,7 @@ export class QuickLocator {
       this.conversationId = newConversationId;
       
       this.markers = [];
+      this.scannedVirtualHistory = false;
       if (this.locatorBar) {
         this.locatorBar.remove();
         this.locatorBar = null;
@@ -115,38 +120,95 @@ export class QuickLocator {
     this.conversationId = this.getConversationId();
     await this.loadStarredMessages();
 
-    const userMessages = new Map<string, HTMLElement>();
+    this.collectVisibleMessages(container);
+
+    if (!this.scannedVirtualHistory && this.shouldScanVirtualHistory(container)) {
+      await this.scanVirtualHistory(container);
+    }
+
+    this.updateLocatorDots();
+  }
+
+  private collectVisibleMessages(container: HTMLElement): void {
+    const markersById = new Map(this.markers.map((marker) => [marker.messageId, marker]));
+    const containerRect = container.getBoundingClientRect();
 
     const messageElements = container.querySelectorAll<HTMLElement>('[data-message-id]');
     messageElements.forEach((el) => {
       if (el.parentElement?.closest('[data-message-id]')) return;
 
-      const hasUserBubble = el.matches('.bg-g-send-msg-bubble-bg, [class*="send-msg"], [class*="send_message"], [class*="user-bubble"]') ||
-        Boolean(el.querySelector('.bg-g-send-msg-bubble-bg, [class*="send-msg"], [class*="send_message"], [class*="user-bubble"]'));
-      const hasUserImageBlock = Boolean(el.querySelector('[data-plugin-identifier*="block_type:10052"]'));
-      const hasJustifyEnd = el.matches('[class*="justify-end"]') || Boolean(el.querySelector('[class*="justify-end"]'));
-
-      if (!hasUserBubble && !(hasUserImageBlock && hasJustifyEnd)) return;
+      if (!this.isUserMessage(el)) return;
 
       const messageId = el.getAttribute('data-message-id');
-      if (messageId) {
-        userMessages.set(messageId, el);
-      }
-    });
+      if (!messageId) return;
 
-    this.markers = Array.from(userMessages.values()).map((el, index) => {
-      const text = this.extractMessageText(el);
-      const finalText = text || `问题 ${index + 1}`;
-      return {
-        id: `marker_${index}`,
+      const messageTop = Math.max(0, container.scrollTop + el.getBoundingClientRect().top - containerRect.top);
+      const existing = markersById.get(messageId);
+      markersById.set(messageId, {
+        id: `marker_${messageId}`,
+        messageId,
         element: el,
-        text: finalText,
-        index,
-        starred: this.starredMarkers.has(index),
-      };
+        text: this.extractMessageText(el) || existing?.text || '问题',
+        index: existing?.index ?? 0,
+        starred: existing?.starred ?? false,
+        scrollTop: messageTop,
+      });
     });
 
-    this.updateLocatorDots();
+    this.markers = Array.from(markersById.values())
+      .sort((a, b) => a.scrollTop - b.scrollTop)
+      .map((marker, index) => ({
+        ...marker,
+        index,
+        text: marker.text === '问题' ? `问题 ${index + 1}` : marker.text,
+        starred: marker.starred || this.starredMarkers.has(index),
+      }));
+  }
+
+  private isUserMessage(element: HTMLElement): boolean {
+    const userBubbleSelector = '.bg-g-send-msg-bubble-bg, [class*="send-msg"], [class*="send_message"], [class*="user-bubble"]';
+    const hasUserBubble = element.matches(userBubbleSelector) || Boolean(element.querySelector(userBubbleSelector));
+    if (hasUserBubble) return true;
+
+    const hasUserImageBlock = Boolean(element.querySelector('[data-plugin-identifier*="block_type:10052"]'));
+    const hasJustifyEnd = element.matches('[class*="justify-end"]') || Boolean(element.querySelector('[class*="justify-end"]'));
+    return hasUserImageBlock && hasJustifyEnd;
+  }
+
+  private shouldScanVirtualHistory(container: HTMLElement): boolean {
+    return container.scrollHeight > container.clientHeight && this.markers.length <= 8;
+  }
+
+  private async scanVirtualHistory(container: HTMLElement): Promise<void> {
+    const originalScrollTop = container.scrollTop;
+    const step = Math.max(320, Math.floor(container.clientHeight * 0.75));
+    const maxSteps = 80;
+    let position = 0;
+    let steps = 0;
+
+    this.isScanningVirtualHistory = true;
+    try {
+      while (steps < maxSteps) {
+        const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
+        container.scrollTop = Math.min(position, maxScrollTop);
+        await this.waitForVirtualRender();
+        this.collectVisibleMessages(container);
+
+        if (position >= maxScrollTop) break;
+        position += step;
+        steps++;
+      }
+    } finally {
+      container.scrollTop = originalScrollTop;
+      await this.waitForVirtualRender();
+      this.collectVisibleMessages(container);
+      this.scannedVirtualHistory = true;
+      this.isScanningVirtualHistory = false;
+    }
+  }
+
+  private waitForVirtualRender(): Promise<void> {
+    return new Promise((resolve) => window.setTimeout(resolve, 120));
   }
 
   private extractMessageText(element: HTMLElement): string {
@@ -220,7 +282,7 @@ export class QuickLocator {
       });
       
       dot.addEventListener('click', () => {
-        this.scrollToMessage(marker);
+        void this.scrollToMessage(marker);
       });
 
       track.appendChild(dot);
@@ -330,14 +392,23 @@ export class QuickLocator {
     }, 150);
   }
 
-  private scrollToMessage(marker: MessageMarker): void {
-    if (!marker.element) return;
+  private async scrollToMessage(marker: MessageMarker): Promise<void> {
+    const container = this.scrollContainer;
+    if (!container) return;
 
-    marker.element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    container.scrollTo({ top: marker.scrollTop, behavior: 'auto' });
+    await this.waitForVirtualRender();
+
+    const messageElement = Array.from(container.querySelectorAll<HTMLElement>('[data-message-id]'))
+      .find((element) => element.getAttribute('data-message-id') === marker.messageId);
+    if (!messageElement) return;
+
+    marker.element = messageElement;
+    messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
     
-    marker.element.classList.add('dbx-message-highlight');
+    messageElement.classList.add('dbx-message-highlight');
     setTimeout(() => {
-      marker.element.classList.remove('dbx-message-highlight');
+      messageElement.classList.remove('dbx-message-highlight');
     }, 2000);
     
     this.scrollLocatorToMarker(marker.index);
@@ -380,7 +451,7 @@ export class QuickLocator {
         }
       }
       
-      if (shouldRescan) {
+      if (shouldRescan && !this.isScanningVirtualHistory) {
         this.debounceScan();
       }
     });
