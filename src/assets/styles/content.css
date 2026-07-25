@@ -619,166 +619,134 @@
   transform: translateY(-50%);
   z-index: 9999;
   width: 18px;
-  height: 55vh;
-  min-height: 160px;
+  height: 150px;
   padding: 0;
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(148, 163, 184, 0.32);
-  border-radius: 10px;
-  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.1);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
 }
 
-#dbx-quick-locator.dbx-locator-dark {
-  background: rgba(30, 33, 39, 0.76);
-  border-color: rgba(148, 163, 184, 0.28);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.28);
-}
-
-.dbx-locator-track {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  cursor: pointer;
-  touch-action: none;
-}
-
-.dbx-locator-rail {
+.dbx-locator-strip {
   position: absolute;
-  top: 7px;
-  bottom: 7px;
-  left: 8px;
-  width: 2px;
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.3);
-}
-
-.dbx-locator-viewport {
-  position: absolute;
-  top: 0;
-  left: 2px;
-  width: 12px;
-  min-height: 24px;
-  border-radius: 7px;
-  background: rgba(79, 70, 229, 0.2);
-  border: 1px solid rgba(79, 70, 229, 0.42);
-  box-sizing: border-box;
-  pointer-events: none;
-  transition: height 120ms ease, transform 120ms ease;
-}
-
-#dbx-quick-locator.dbx-locator-dark .dbx-locator-rail {
-  background: rgba(148, 163, 184, 0.4);
-}
-
-#dbx-quick-locator.dbx-locator-dark .dbx-locator-viewport {
-  background: rgba(129, 140, 248, 0.28);
-  border-color: rgba(165, 180, 252, 0.58);
-}
-
-.dbx-locator-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #94a3b8;
-  border: 2px solid rgba(255, 255, 255, 0.88);
-  box-sizing: border-box;
-  cursor: pointer;
-  transition: background-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
-  position: absolute;
-  left: 5px;
-  transform: translateY(-50%);
-  padding: 0;
-  z-index: 2;
-}
-
-#dbx-quick-locator.dbx-locator-dark .dbx-locator-dot {
-  background: #a8b0bc;
-  border-color: #202329;
-}
-
-.dbx-locator-dot:hover {
-  transform: translateY(-50%) scale(1.8);
-  background: #6366f1;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
-  z-index: 10001;
-  position: absolute;
-}
-
-.dbx-locator-tooltip {
-  position: absolute;
-  right: 100%;
-  top: 50%;
-  transform: translateY(-50%);
-  margin-right: 16px;
-  background: var(--dbx-folder-bg-base, #fff);
-  color: var(--dbx-folder-text-primary, #333);
-  padding: 10px 12px;
-  border-radius: 10px;
-  font-size: 13px;
-  white-space: normal;
-  word-break: break-word;
-  max-width: 260px;
-  min-width: 140px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  pointer-events: auto;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.15s ease, visibility 0.15s ease;
-  z-index: 10000;
+  inset: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-
-.dbx-locator-dot:hover .dbx-locator-tooltip {
-  opacity: 1 !important;
-  visibility: visible !important;
-}
-
-.dbx-locator-tooltip-text {
-  color: var(--dbx-folder-text-primary, #333);
-  line-height: 1.4;
-}
-
-.dbx-locator-tooltip-star {
-  display: flex;
+  justify-content: space-between;
   align-items: center;
-  justify-content: flex-start;
-  gap: 6px;
-  padding: 6px 8px;
-  margin: 0 -4px;
-  border-radius: 6px;
-  font-size: 12px;
-  color: var(--dbx-folder-text-secondary, #666);
-  cursor: pointer;
-  transition: all 0.15s ease;
-  background: transparent;
+  padding: 2px 0;
+  box-sizing: border-box;
+}
+
+.dbx-locator-strip.single {
+  justify-content: center;
+}
+
+.dbx-locator-bar {
+  width: 13px;
+  height: 2px;
+  flex: 0 0 2px;
+  padding: 0;
   border: none;
-  width: fit-content;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.75);
+  cursor: pointer;
+  transition: width 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
 }
 
-.dbx-locator-tooltip-star:hover {
-  background: var(--dbx-folder-bg-hover, #f5f5f5);
-  color: var(--dbx-folder-primary, #4f46e5);
+.dbx-locator-bar:hover,
+.dbx-locator-bar:focus-visible {
+  width: 17px;
+  outline: none;
+  background: #a5b4fc;
+  box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.22);
 }
 
-.dbx-locator-tooltip-star.starred {
-  color: #f59e0b;
+.dbx-locator-bar.active {
+  width: 17px;
+  background: #5eead4;
 }
 
-.dbx-locator-tooltip-star.starred svg {
-  fill: #f59e0b;
-}
-
-.dbx-locator-dot.starred {
+.dbx-locator-bar.starred {
   background: #f59e0b;
-  transform: translateY(-50%) scale(1.2);
 }
 
-.dbx-locator-dot.starred:hover {
-  background: #d97706;
+.dbx-locator-panel {
+  position: absolute;
+  right: 18px;
+  top: 50%;
+  width: 320px;
+  max-height: 360px;
+  padding: 8px;
+  box-sizing: border-box;
+  overflow: hidden;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-50%) translateX(8px);
+  border: 1px solid rgba(71, 85, 105, 0.42);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.2);
+  transition: opacity 160ms ease, visibility 160ms ease, transform 160ms ease;
+}
+
+#dbx-quick-locator.dbx-locator-dark .dbx-locator-panel {
+  border-color: rgba(71, 85, 105, 0.72);
+  background: rgba(10, 20, 34, 0.97);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+
+#dbx-quick-locator:hover .dbx-locator-panel,
+#dbx-quick-locator:focus-within .dbx-locator-panel {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(-50%) translateX(0);
+}
+
+.dbx-locator-message-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 344px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.6) transparent;
+}
+
+.dbx-locator-message {
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  padding: 5px 8px;
+  overflow: hidden;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: #334155;
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  letter-spacing: 0;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+#dbx-quick-locator.dbx-locator-dark .dbx-locator-message {
+  color: #e2e8f0;
+}
+
+.dbx-locator-message:hover,
+.dbx-locator-message:focus-visible {
+  outline: none;
+  background: rgba(99, 102, 241, 0.12);
+}
+
+.dbx-locator-message.active {
+  background: rgba(45, 212, 191, 0.16);
+  color: #0f766e;
+}
+
+#dbx-quick-locator.dbx-locator-dark .dbx-locator-message.active {
+  background: rgba(45, 212, 191, 0.16);
+  color: #ccfbf1;
 }
 
 .dbx-message-highlight {
